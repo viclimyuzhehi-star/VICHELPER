@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  vicai-nexus:
+    build: .
+    container_name: vicai-nexus
+    ports:
+      - "8080:8080"
+      - "8081:8081"  # Monitoring
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1,2,3
+      - PYTHONPATH=/app
+      - MODEL_PATH=/app/models
+      - DATA_PATH=/app/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
+
+  vicai-monitor:
+    image: grafana/grafana:latest
+    container_name: vicai-monitor
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=vicai123
+
+  vicai-database:
+    image: redis:7-alpine
+    container_name: vicai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    command: redis-server --appendonly yes
